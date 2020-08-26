@@ -34,7 +34,7 @@ def decode_modified_utf8(s: bytes) -> str:
                     'mutf-8',
                     s,
                     ix - 1,
-                    ix,
+                    ix - 1,
                     'Incomplete two-byte codepoint.',
                 )
 
@@ -49,7 +49,7 @@ def decode_modified_utf8(s: bytes) -> str:
                     'mutf-8',
                     s,
                     ix - 1,
-                    ix,
+                    ix - 1,
                     'Incomplete six-byte codepoint.'
                 )
 
@@ -68,7 +68,7 @@ def decode_modified_utf8(s: bytes) -> str:
                     'mutf-8',
                     s,
                     ix - 1,
-                    ix,
+                    ix - 1,
                     'Incomplete three-byte codepoint.'
                 )
 
@@ -93,16 +93,16 @@ def encode_modified_utf8(u: str) -> bytes:
         if c == 0x00:
             # NULL byte encoding shortcircuit.
             final_string.extend([0xC0, 0x80])
-        elif c < 0x7F:
+        elif c <= 0x7F:
             # ASCII
             final_string.append(c)
-        elif c < 0x7FF:
+        elif c <= 0x7FF:
             # Two-byte codepoint.
             final_string.extend([
                 (0xC0 | (0x1F & (c >> 6))),
                 (0x80 | (0x3F & c))
             ])
-        elif c < 0xFFFF:
+        elif c <= 0xFFFF:
             # Three-byte codepoint.
             final_string.extend([
                 (0xE0 | (0x0F & (c >> 12))),

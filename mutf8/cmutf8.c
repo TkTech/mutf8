@@ -126,14 +126,14 @@ encode_modified_utf8(PyObject *self, PyObject *args) {
             // NULL byte encoding shortcircuit.
             byte_out[byte_count++] = 0xC0;
             byte_out[byte_count++] = 0x80;
-        } else if (cp < 0x7F) {
+        } else if (cp <= 0x7F) {
             // ASCII
             byte_out[byte_count++] = cp;
-        } else if (cp < 0x7FF) {
+        } else if (cp <= 0x7FF) {
             // Two-byte codepoint.
             byte_out[byte_count++] = (0xC0 | (0x1F & (cp >> 6)));
             byte_out[byte_count++] = (0x80 | (0x3F & cp));
-        } else if (cp < 0xFFFF) {
+        } else if (cp <= 0xFFFF) {
             // Three-byte codepoint
             byte_out[byte_count++] = (0xE0 | (0x0F & (cp >> 12)));
             byte_out[byte_count++] = (0x80 | (0x3F & (cp >> 6)));
