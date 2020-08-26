@@ -3,6 +3,14 @@
 #include <stdint.h>
 #include <stdio.h>
 
+static const char *DECODING_ERRORS[] = {
+    "mutf-8 does not allow NULL bytes.",
+    "Incomplete two-byte codepoint.",
+    "Incomplete three-byte codepoint.",
+    "Incomplete six-byte codepoint.",
+    NULL
+};
+
 static PyObject*
 decode_modified_utf8(PyObject *self, PyObject *args) {
     Py_buffer view;
@@ -20,25 +28,30 @@ decode_modified_utf8(PyObject *self, PyObject *args) {
     uint32_t *cp_out = malloc(view.len);
     // # of codepoints we found & current index into cp_out.
     Py_ssize_t cp_count = 0;
+    int error = -1;
 
     for (Py_ssize_t ix = 0; ix < view.len; ix++) {
         Py_UCS4 x = buf[ix];
-        if (x >> 7 == 0) {
+        if (x == 0) {
+            error = 0;
+            break;
+        } else if (x >> 7 == 0) {
             // ASCII/one-byte codepoint.
             x &= 0x7F;
         } else if (x >> 5 == 6) {
             // Two-byte codepoint.
+            if (ix + 1 >= view.len) {
+                error = 1;
+                break;
+            }
             x = ((x & 0x1F) << 6) + (buf[ix + 1] & 0x3F);
             ix++;
         } else if (x == 0xED) {
             // "two-times-three" byte codepoint. mutf8 alternative to 4-byte
             // codepoints.
-            if (ix + 5 > view.len) {
-                // There aren't enough bytes left in the input to complete
-                // a codepoint.
-                free(cp_out);
-                PyBuffer_Release(&view);
-                return NULL;
+            if (ix + 5 >= view.len) {
+                error = 3;
+                break;
             }
             // The 3rd byte is ignored - it's the 2nd pair's 0xED.
             x = 0x10000 + (
@@ -50,12 +63,9 @@ decode_modified_utf8(PyObject *self, PyObject *args) {
             ix += 5;
         } else if (x >> 4 == 14) {
             // Three-byte codepoint.
-            if (ix + 2 > view.len) {
-                // There aren't enough bytes left in the input to complete
-                // a codepoint.
-                free(cp_out);
-                PyBuffer_Release(&view);
-                return NULL;
+            if (ix + 2 >= view.len) {
+                error = 2;
+                break;
             }
             x = ((x & 0x0F) << 12) +
                 ((buf[ix + 1] & 0x3F) << 6) +
@@ -63,6 +73,24 @@ decode_modified_utf8(PyObject *self, PyObject *args) {
             ix += 2;
         }
         cp_out[cp_count++] = x;
+    }
+
+    if (error != -1) {
+        PyObject *unicode_error = PyObject_CallFunction(
+            PyExc_UnicodeDecodeError,
+            "sy#nns",
+            "utf-8",
+            "",
+            0,
+            0,
+            1,
+            DECODING_ERRORS[error]
+        );
+        PyErr_SetObject(PyExc_UnicodeDecodeError, unicode_error);
+        Py_XDECREF(unicode_error);
+        free(cp_out);
+        PyBuffer_Release(&view);
+        return NULL;
     }
 
     PyObject *out = PyUnicode_FromKindAndData(

@@ -10,21 +10,49 @@ def decode_modified_utf8(s: bytes) -> str:
     buff = []
     buffer_append = buff.append
     ix = 0
+    length = len(s)
+
     while ix < len(s):
         x = s[ix]
         ix += 1
 
-        if x >> 7 == 0:
+        if x == 0:
+            raise UnicodeDecodeError(
+                'mutf-8',
+                s,
+                ix - 1,
+                ix - 1,
+                'mutf-8 does not allow NULL bytes.',
+            )
+        elif x >> 7 == 0:
             # ASCII
             x = x & 0x7F
         elif x >> 5 == 6:
             # Two-byte codepoint.
+            if ix + 1 > length:
+                raise UnicodeDecodeError(
+                    'mutf-8',
+                    s,
+                    ix - 1,
+                    ix,
+                    'Incomplete two-byte codepoint.',
+                )
+
             y = s[ix]
             ix += 1
             x = ((x & 0x1F) << 6) + (y & 0x3F)
         elif x == 0xED:
             # "two-times-three" byte codepoint. mutf8 alternative to
             # 4-byte codepoints.
+            if ix + 5 > length:
+                raise UnicodeDecodeError(
+                    'mutf-8',
+                    s,
+                    ix - 1,
+                    ix,
+                    'Incomplete six-byte codepoint.'
+                )
+
             v, w, x, y, z = s[ix:ix+5]
             ix += 5
             x = 0x10000 + (
@@ -35,6 +63,15 @@ def decode_modified_utf8(s: bytes) -> str:
             )
         elif x >> 4 == 14:
             # Three-byte codepoint.
+            if ix + 2 > length:
+                raise UnicodeDecodeError(
+                    'mutf-8',
+                    s,
+                    ix - 1,
+                    ix,
+                    'Incomplete three-byte codepoint.'
+                )
+
             y, z = s[ix:ix+2]
             ix += 2
             x = ((x & 0xF) << 12) + ((y & 0x3F) << 6) + (z & 0x3F)
