@@ -35,41 +35,45 @@ decode_modified_utf8(PyObject *self, PyObject *args) {
         if (x == 0) {
             error = 0;
             break;
-        } else if (x >> 7 == 0) {
+        } else if (x >> 7 == 0x00) {
             // ASCII/one-byte codepoint.
             x &= 0x7F;
-        } else if (x >> 5 == 6) {
+        } else if (x >> 5 == 0x06) {
             // Two-byte codepoint.
             if (ix + 1 >= view.len) {
                 error = 1;
                 break;
             }
-            x = ((x & 0x1F) << 0x06) + (buf[ix + 1] & 0x3F);
+            x = (
+                (buf[ix + 0] & 0x1F) << 0x06 |
+                (buf[ix + 1] & 0x3F)
+            );
             ix++;
         } else if (x == 0xED) {
-            // "two-times-three" byte codepoint. mutf8 alternative to 4-byte
-            // codepoints.
+            // Six-byte codepoint.
             if (ix + 5 >= view.len) {
                 error = 3;
                 break;
             }
-            // The 3rd byte is ignored - it's the 2nd pair's 0xED.
-            x = 0x10000 + (
-                ((buf[ix + 1] & 0x0F) << 0x10) +
-                ((buf[ix + 2] & 0x3F) << 0x0A) +
-                ((buf[ix + 4] & 0x0F) << 0x06) +
+            x = (
+                0x10000 |
+                (buf[ix + 1] & 0x0F) << 0x10 |
+                (buf[ix + 2] & 0x3F) << 0x0A |
+                (buf[ix + 4] & 0x0F) << 0x06 |
                 (buf[ix + 5] & 0x3F)
             );
             ix += 5;
-        } else if (x >> 4 == 14) {
+        } else if (x >> 4 == 0x0E) {
             // Three-byte codepoint.
             if (ix + 2 >= view.len) {
                 error = 2;
                 break;
             }
-            x = ((x & 0x0F) << 0x0C) +
-                ((buf[ix + 1] & 0x3F) << 0x06) +
-                (buf[ix + 2] & 0x3F);
+            x = (
+                (buf[ix + 0] & 0x0F) << 0x0C |
+                (buf[ix + 1] & 0x3F) << 0x06 |
+                (buf[ix + 2] & 0x3F)
+            );
             ix += 2;
         }
         cp_out[cp_count++] = x;
@@ -140,7 +144,6 @@ encode_modified_utf8(PyObject *self, PyObject *args) {
             byte_out[byte_count++] = (0x80 | (0x3F & cp));
         } else {
             // "Two-times-three" byte codepoint.
-            cp -= 0x10000;
             byte_out[byte_count++] = 0xED;
             byte_out[byte_count++] = 0xA0 | ((cp >> 0x10) & 0x0F);
             byte_out[byte_count++] = 0x80 | ((cp >> 0x0A) & 0x3F);

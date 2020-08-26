@@ -13,7 +13,7 @@ setup(
     name='mutf8',
     packages=find_packages(),
     version='1.0.0',
-    description='MUTF-8 encoder & decoder',
+    description='Fast MUTF-8 encoder & decoder',
     long_description=long_description,
     long_description_content_type='text/markdown',
     author='Tyler Kennedy',

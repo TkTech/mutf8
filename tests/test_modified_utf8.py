@@ -123,7 +123,7 @@ def test_three_byte(module):
         assert module.encode_modified_utf8(decoded) == original
 
 
-@pytest.mark.parametrize('module', [pymutf8])
+@pytest.mark.parametrize('module', [pymutf8, cmutf8])
 def test_six_byte(module):
     """
     Test six-byte encoding and decoding.
