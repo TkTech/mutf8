@@ -22,11 +22,11 @@ def decode_modified_utf8(s: bytes) -> str:
                 ix - 1,
                 'mutf-8 does not allow NULL bytes.',
             )
-        elif x & 0b1000_0000 == 0b0000_0000:
+        elif x & 0b10000000 == 0b00000000:
             # ASCII
             x = x & 0x7F
             ix += 1
-        elif x & 0b1110_0000 == 0b1100_0000:
+        elif x & 0b11100000 == 0b11000000:
             # Two-byte codepoint.
             if ix + 1 >= length:
                 raise UnicodeDecodeError(
@@ -38,12 +38,12 @@ def decode_modified_utf8(s: bytes) -> str:
                 )
 
             x = (
-                (s[ix + 0] & 0b0001_1111) << 0x06 |
-                (s[ix + 1] & 0b0011_1111)
+                (s[ix + 0] & 0b00011111) << 0x06 |
+                (s[ix + 1] & 0b00111111)
             )
 
             ix += 2
-        elif x == 0b1110_1101:
+        elif x == 0b11101101:
             # Six-byte codepoint.
             if ix + 5 >= length:
                 raise UnicodeDecodeError(
@@ -56,10 +56,10 @@ def decode_modified_utf8(s: bytes) -> str:
 
             x = (
                 0x10000 |
-                (s[ix + 1] & 0b0000_1111) << 0x10 |
-                (s[ix + 2] & 0b0011_1111) << 0x0A |
-                (s[ix + 4] & 0b0000_1111) << 0x06 |
-                (s[ix + 5] & 0b0011_1111)
+                (s[ix + 1] & 0b00001111) << 0x10 |
+                (s[ix + 2] & 0b00111111) << 0x0A |
+                (s[ix + 4] & 0b00001111) << 0x06 |
+                (s[ix + 5] & 0b00111111)
             )
 
             ix += 6
@@ -75,9 +75,9 @@ def decode_modified_utf8(s: bytes) -> str:
                 )
 
             x = (
-                (s[ix + 0] & 0b0000_1111) << 0x0C |
-                (s[ix + 1] & 0b0011_1111) << 0x06 |
-                (s[ix + 2] & 0b0011_1111)
+                (s[ix + 0] & 0b00001111) << 0x0C |
+                (s[ix + 1] & 0b00111111) << 0x06 |
+                (s[ix + 2] & 0b00111111)
             )
 
             ix += 3
