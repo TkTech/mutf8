@@ -14,6 +14,26 @@ serializer.
 This library was extracted from [Lawu][], a Python library for working with JVM
 class files.
 
+## Usage
+
+Install the package from PyPi:
+
+```
+pip install mutf8
+```
+
+Encoding and decoding is simple:
+
+```python
+from mutf8 import encode_modified_utf8, decode_modified_utf8
+
+unicode = decode_modified_utf8(byte_like_object)
+bytes = encode_modified_utf8(unicode)
+```
+
+This module *does not* register itself globally as a codec, since importing
+should be side-effect-free.
+
 ## 📈 Benchmarks
 
 The C extension is significantly faster - often 20x to 40x faster.
