@@ -27,7 +27,7 @@ def decode_modified_utf8(s: bytes) -> str:
         elif x >> 7 == 0:
             # ASCII
             x = x & 0x7F
-        elif x >> 5 == 6:
+        elif x >> 5 == 0b110:
             # Two-byte codepoint.
             if ix + 1 > length:
                 raise UnicodeDecodeError(
@@ -61,7 +61,7 @@ def decode_modified_utf8(s: bytes) -> str:
                 ((y & 0x0F) << 6) +
                 (z & 0x3F)
             )
-        elif x >> 4 == 14:
+        elif x >> 4 == 0b1110:
             # Three-byte codepoint.
             if ix + 2 > length:
                 raise UnicodeDecodeError(
@@ -99,14 +99,14 @@ def encode_modified_utf8(u: str) -> bytes:
         elif c <= 0x7FF:
             # Two-byte codepoint.
             final_string.extend([
-                (0xC0 | (0x1F & (c >> 6))),
+                (0xC0 | (0x1F & (c >> 0x06))),
                 (0x80 | (0x3F & c))
             ])
         elif c <= 0xFFFF:
             # Three-byte codepoint.
             final_string.extend([
-                (0xE0 | (0x0F & (c >> 12))),
-                (0x80 | (0x3F & (c >> 6))),
+                (0xE0 | (0x0F & (c >> 0x0C))),
+                (0x80 | (0x3F & (c >> 0x06))),
                 (0x80 | (0x3F & c))
             ])
         else:
@@ -114,10 +114,10 @@ def encode_modified_utf8(u: str) -> bytes:
             c -= 0x10000
             final_string.extend([
                 0xED,
-                0xA0 | ((c >> 16) & 0x0F),
-                0x80 | ((c >> 10) & 0x3f),
+                0xA0 | ((c >> 0x10) & 0x0F),
+                0x80 | ((c >> 0x0A) & 0x3f),
                 0xED,
-                0xb0 | ((c >> 6) & 0x0f),
+                0xb0 | ((c >> 0x06) & 0x0f),
                 0x80 | (c & 0x3f)
             ])
 

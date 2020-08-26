@@ -44,7 +44,7 @@ decode_modified_utf8(PyObject *self, PyObject *args) {
                 error = 1;
                 break;
             }
-            x = ((x & 0x1F) << 6) + (buf[ix + 1] & 0x3F);
+            x = ((x & 0x1F) << 0x06) + (buf[ix + 1] & 0x3F);
             ix++;
         } else if (x == 0xED) {
             // "two-times-three" byte codepoint. mutf8 alternative to 4-byte
@@ -55,9 +55,9 @@ decode_modified_utf8(PyObject *self, PyObject *args) {
             }
             // The 3rd byte is ignored - it's the 2nd pair's 0xED.
             x = 0x10000 + (
-                ((buf[ix + 1] & 0x0F) << 16) +
-                ((buf[ix + 2] & 0x3F) << 10) +
-                ((buf[ix + 4] & 0x0F) << 6) +
+                ((buf[ix + 1] & 0x0F) << 0x10) +
+                ((buf[ix + 2] & 0x3F) << 0x0A) +
+                ((buf[ix + 4] & 0x0F) << 0x06) +
                 (buf[ix + 5] & 0x3F)
             );
             ix += 5;
@@ -67,8 +67,8 @@ decode_modified_utf8(PyObject *self, PyObject *args) {
                 error = 2;
                 break;
             }
-            x = ((x & 0x0F) << 12) +
-                ((buf[ix + 1] & 0x3F) << 6) +
+            x = ((x & 0x0F) << 0x0C) +
+                ((buf[ix + 1] & 0x3F) << 0x06) +
                 (buf[ix + 2] & 0x3F);
             ix += 2;
         }
@@ -131,21 +131,21 @@ encode_modified_utf8(PyObject *self, PyObject *args) {
             byte_out[byte_count++] = cp;
         } else if (cp <= 0x7FF) {
             // Two-byte codepoint.
-            byte_out[byte_count++] = (0xC0 | (0x1F & (cp >> 6)));
+            byte_out[byte_count++] = (0xC0 | (0x1F & (cp >> 0x06)));
             byte_out[byte_count++] = (0x80 | (0x3F & cp));
         } else if (cp <= 0xFFFF) {
             // Three-byte codepoint
-            byte_out[byte_count++] = (0xE0 | (0x0F & (cp >> 12)));
-            byte_out[byte_count++] = (0x80 | (0x3F & (cp >> 6)));
+            byte_out[byte_count++] = (0xE0 | (0x0F & (cp >> 0x0C)));
+            byte_out[byte_count++] = (0x80 | (0x3F & (cp >> 0x06)));
             byte_out[byte_count++] = (0x80 | (0x3F & cp));
         } else {
             // "Two-times-three" byte codepoint.
             cp -= 0x10000;
             byte_out[byte_count++] = 0xED;
-            byte_out[byte_count++] = 0xA0 | ((cp >> 16) & 0x0F);
-            byte_out[byte_count++] = 0x80 | ((cp >> 10) & 0x3F);
+            byte_out[byte_count++] = 0xA0 | ((cp >> 0x10) & 0x0F);
+            byte_out[byte_count++] = 0x80 | ((cp >> 0x0A) & 0x3F);
             byte_out[byte_count++] = 0xED;
-            byte_out[byte_count++] = 0xB0 | ((cp >> 6) & 0x0F);
+            byte_out[byte_count++] = 0xB0 | ((cp >> 0x06) & 0x0F);
             byte_out[byte_count++] = 0x80 | (cp & 0x3F);
         }
     }
