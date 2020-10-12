@@ -1,7 +1,6 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <stdint.h>
-#include <stdio.h>
 
 static const char *DECODING_ERRORS[] = {
     "mutf-8 does not allow NULL bytes.",
@@ -25,7 +24,11 @@ decode_modified_utf8(PyObject *self, PyObject *args) {
     // There's no point using PyUnicode_new and _WriteChar, because
     // it requires us to have iterated the string to get the maximum unicode
     // codepoint and count anyways.
-    uint32_t *cp_out = malloc(view.len);
+    uint32_t *cp_out = PyMem_Calloc(view.len, sizeof(Py_UCS4));
+    if (!cp_out) {
+        return PyErr_NoMemory();
+    }
+
     // # of codepoints we found & current index into cp_out.
     Py_ssize_t cp_count = 0;
     int error = -1;
@@ -92,7 +95,7 @@ decode_modified_utf8(PyObject *self, PyObject *args) {
         );
         PyErr_SetObject(PyExc_UnicodeDecodeError, unicode_error);
         Py_XDECREF(unicode_error);
-        free(cp_out);
+        PyMem_Free(cp_out);
         PyBuffer_Release(&view);
         return NULL;
     }
@@ -103,7 +106,7 @@ decode_modified_utf8(PyObject *self, PyObject *args) {
         cp_count
     );
 
-    free(cp_out);
+    PyMem_Free(cp_out);
     PyBuffer_Release(&view);
     return out;
 }
@@ -121,7 +124,11 @@ encode_modified_utf8(PyObject *self, PyObject *args) {
     int kind = PyUnicode_KIND(src);
     // There's no case in which the encoded version will be more than
     // twice the size of the decoded version.
-    char *byte_out = malloc(length * 2);
+    char *byte_out = PyMem_Calloc(length * 2, 1);
+    if (!byte_out) {
+        return PyErr_NoMemory();
+    }
+
     Py_ssize_t byte_count = 0;
 
     for (Py_ssize_t i = 0; i < length; i++) {
@@ -154,7 +161,7 @@ encode_modified_utf8(PyObject *self, PyObject *args) {
     }
 
     PyObject *out = PyBytes_FromStringAndSize(byte_out, byte_count);
-    free(byte_out);
+    PyMem_Free(byte_out);
     return out;
 }
 
