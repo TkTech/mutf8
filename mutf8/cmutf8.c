@@ -3,15 +3,13 @@
 #include <stdint.h>
 
 static const char *DECODING_ERRORS[] = {
-    "mutf-8 does not allow NULL bytes.",
-    "Incomplete two-byte codepoint.",
-    "Incomplete three-byte codepoint.",
-    "Incomplete six-byte codepoint.",
-    NULL
-};
+    "mutf-8 does not allow NULL bytes.", "Incomplete two-byte codepoint.",
+    "Incomplete three-byte codepoint.", "Incomplete six-byte codepoint.",
+    NULL};
 
-static PyObject*
-decode_modified_utf8(PyObject *self, PyObject *args) {
+static PyObject *
+decode_modified_utf8(PyObject *self, PyObject *args)
+{
     Py_buffer view;
 
     if (!PyArg_ParseTuple(args, "y*", &view)) {
@@ -19,7 +17,7 @@ decode_modified_utf8(PyObject *self, PyObject *args) {
     }
 
     // MUTF-8 input.
-    uint8_t *buf = (uint8_t*)view.buf;
+    uint8_t *buf = (uint8_t *)view.buf;
     // Array of temporary UCS-4 codepoints.
     // There's no point using PyUnicode_new and _WriteChar, because
     // it requires us to have iterated the string to get the maximum unicode
@@ -38,61 +36,48 @@ decode_modified_utf8(PyObject *self, PyObject *args) {
         if (x == 0) {
             error = 0;
             break;
-        } else if (x >> 7 == 0x00) {
+        }
+        else if (x >> 7 == 0x00) {
             // ASCII/one-byte codepoint.
             x &= 0x7F;
-        } else if (x >> 5 == 0x06) {
+        }
+        else if (x >> 5 == 0x06) {
             // Two-byte codepoint.
             if (ix + 1 >= view.len) {
                 error = 1;
                 break;
             }
-            x = (
-                (buf[ix + 0] & 0x1F) << 0x06 |
-                (buf[ix + 1] & 0x3F)
-            );
+            x = ((buf[ix + 0] & 0x1F) << 0x06 | (buf[ix + 1] & 0x3F));
             ix++;
-        } else if (x == 0xED) {
+        }
+        else if (x == 0xED) {
             // Six-byte codepoint.
             if (ix + 5 >= view.len) {
                 error = 3;
                 break;
             }
-            x = (
-                0x10000 |
-                (buf[ix + 1] & 0x0F) << 0x10 |
-                (buf[ix + 2] & 0x3F) << 0x0A |
-                (buf[ix + 4] & 0x0F) << 0x06 |
-                (buf[ix + 5] & 0x3F)
-            );
+            x = (0x10000 | (buf[ix + 1] & 0x0F) << 0x10 |
+                 (buf[ix + 2] & 0x3F) << 0x0A | (buf[ix + 4] & 0x0F) << 0x06 |
+                 (buf[ix + 5] & 0x3F));
             ix += 5;
-        } else if (x >> 4 == 0x0E) {
+        }
+        else if (x >> 4 == 0x0E) {
             // Three-byte codepoint.
             if (ix + 2 >= view.len) {
                 error = 2;
                 break;
             }
-            x = (
-                (buf[ix + 0] & 0x0F) << 0x0C |
-                (buf[ix + 1] & 0x3F) << 0x06 |
-                (buf[ix + 2] & 0x3F)
-            );
+            x = ((buf[ix + 0] & 0x0F) << 0x0C | (buf[ix + 1] & 0x3F) << 0x06 |
+                 (buf[ix + 2] & 0x3F));
             ix += 2;
         }
         cp_out[cp_count++] = x;
     }
 
     if (error != -1) {
-        PyObject *unicode_error = PyObject_CallFunction(
-            PyExc_UnicodeDecodeError,
-            "sy#nns",
-            "utf-8",
-            "",
-            0,
-            0,
-            1,
-            DECODING_ERRORS[error]
-        );
+        PyObject *unicode_error =
+            PyObject_CallFunction(PyExc_UnicodeDecodeError, "sy#nns", "utf-8",
+                                  "", 0, 0, 1, DECODING_ERRORS[error]);
         PyErr_SetObject(PyExc_UnicodeDecodeError, unicode_error);
         Py_XDECREF(unicode_error);
         PyMem_Free(cp_out);
@@ -100,19 +85,17 @@ decode_modified_utf8(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    PyObject *out = PyUnicode_FromKindAndData(
-        PyUnicode_4BYTE_KIND,
-        cp_out,
-        cp_count
-    );
+    PyObject *out =
+        PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND, cp_out, cp_count);
 
     PyMem_Free(cp_out);
     PyBuffer_Release(&view);
     return out;
 }
 
-static PyObject*
-encode_modified_utf8(PyObject *self, PyObject *args) {
+static PyObject *
+encode_modified_utf8(PyObject *self, PyObject *args)
+{
     PyObject *src = NULL;
 
     if (!PyArg_ParseTuple(args, "U", &src)) {
@@ -137,19 +120,23 @@ encode_modified_utf8(PyObject *self, PyObject *args) {
             // NULL byte encoding shortcircuit.
             byte_out[byte_count++] = 0xC0;
             byte_out[byte_count++] = 0x80;
-        } else if (cp <= 0x7F) {
+        }
+        else if (cp <= 0x7F) {
             // ASCII
             byte_out[byte_count++] = cp;
-        } else if (cp <= 0x7FF) {
+        }
+        else if (cp <= 0x7FF) {
             // Two-byte codepoint.
             byte_out[byte_count++] = (0xC0 | (0x1F & (cp >> 0x06)));
             byte_out[byte_count++] = (0x80 | (0x3F & cp));
-        } else if (cp <= 0xFFFF) {
+        }
+        else if (cp <= 0xFFFF) {
             // Three-byte codepoint
             byte_out[byte_count++] = (0xE0 | (0x0F & (cp >> 0x0C)));
             byte_out[byte_count++] = (0x80 | (0x3F & (cp >> 0x06)));
             byte_out[byte_count++] = (0x80 | (0x3F & cp));
-        } else {
+        }
+        else {
             // "Two-times-three" byte codepoint.
             byte_out[byte_count++] = 0xED;
             byte_out[byte_count++] = 0xA0 | ((cp >> 0x10) & 0x0F);
@@ -166,37 +153,25 @@ encode_modified_utf8(PyObject *self, PyObject *args) {
 }
 
 static PyMethodDef module_methods[] = {
-    {
-        "decode_modified_utf8",
-        decode_modified_utf8,
-        METH_VARARGS,
-        "Decodes a bytestring containing MUTF-8 as defined in section\n"
-        "4.4.7 of the JVM specification.\n\n"
-        ":param s: A byte/buffer-like to be converted.\n"
-        ":returns: A unicode representation of the original string."
-    },
-    {
-        "encode_modified_utf8",
-        encode_modified_utf8,
-        METH_VARARGS,
-        "Encodes a unicode string as MUTF-8 as defined in section\n"
-        "4.4.7 of the JVM specification.\n\n"
-        ":param u: Unicode string to be converted.\n"
-        ":returns: The encoded string as a `bytes` object."
-    },
-    {NULL, NULL, 0, NULL}
-};
+    {"decode_modified_utf8", decode_modified_utf8, METH_VARARGS,
+     "Decodes a bytestring containing MUTF-8 as defined in section\n"
+     "4.4.7 of the JVM specification.\n\n"
+     ":param s: A byte/buffer-like to be converted.\n"
+     ":returns: A unicode representation of the original string."},
+    {"encode_modified_utf8", encode_modified_utf8, METH_VARARGS,
+     "Encodes a unicode string as MUTF-8 as defined in section\n"
+     "4.4.7 of the JVM specification.\n\n"
+     ":param u: Unicode string to be converted.\n"
+     ":returns: The encoded string as a `bytes` object."},
+    {NULL, NULL, 0, NULL}};
 
 static struct PyModuleDef cmutf8_module = {
-    PyModuleDef_HEAD_INIT,
-    "mutf8.cmutf8",
-    "Encoders and decoders for the MUTF-8 encoding.",
-    -1,
-    module_methods
-};
+    PyModuleDef_HEAD_INIT, "mutf8.cmutf8",
+    "Encoders and decoders for the MUTF-8 encoding.", -1, module_methods};
 
 PyMODINIT_FUNC
-PyInit_cmutf8(void) {
+PyInit_cmutf8(void)
+{
     PyObject *m;
 
     m = PyModule_Create(&cmutf8_module);
