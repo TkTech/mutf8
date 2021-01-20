@@ -3,10 +3,18 @@
 #include <stdint.h>
 
 static const char *DECODING_ERRORS[] = {
-    "mutf-8 does not allow NULL bytes.", "Incomplete two-byte codepoint.",
-    "Incomplete three-byte codepoint.", "Incomplete six-byte codepoint.",
-    NULL};
+    "mutf-8 does not allow NULL bytes.",
+    "Incomplete two-byte codepoint.",
+    "Incomplete three-byte codepoint.",
+    "Incomplete six-byte codepoint.",
+    NULL,
+};
 
+PyDoc_STRVAR(decode_doc,
+             "Decodes a bytestring containing MUTF-8 as defined in section\n"
+             "4.4.7 of the JVM specification.\n\n"
+             ":param s: A byte/buffer-like to be converted.\n"
+             ":returns: A unicode representation of the original string.");
 static PyObject *
 decode_modified_utf8(PyObject *self, PyObject *args)
 {
@@ -93,6 +101,11 @@ decode_modified_utf8(PyObject *self, PyObject *args)
     return out;
 }
 
+PyDoc_STRVAR(encode_doc,
+             "Encodes a unicode string as MUTF-8 as defined in section\n"
+             "4.4.7 of the JVM specification.\n\n"
+             ":param u: Unicode string to be converted.\n"
+             ":returns: The encoded string as a `bytes` object.");
 static PyObject *
 encode_modified_utf8(PyObject *self, PyObject *args)
 {
@@ -153,21 +166,17 @@ encode_modified_utf8(PyObject *self, PyObject *args)
 }
 
 static PyMethodDef module_methods[] = {
-    {"decode_modified_utf8", decode_modified_utf8, METH_VARARGS,
-     "Decodes a bytestring containing MUTF-8 as defined in section\n"
-     "4.4.7 of the JVM specification.\n\n"
-     ":param s: A byte/buffer-like to be converted.\n"
-     ":returns: A unicode representation of the original string."},
-    {"encode_modified_utf8", encode_modified_utf8, METH_VARARGS,
-     "Encodes a unicode string as MUTF-8 as defined in section\n"
-     "4.4.7 of the JVM specification.\n\n"
-     ":param u: Unicode string to be converted.\n"
-     ":returns: The encoded string as a `bytes` object."},
+    {"decode_modified_utf8", decode_modified_utf8, METH_VARARGS, decode_doc},
+    {"encode_modified_utf8", encode_modified_utf8, METH_VARARGS, encode_doc},
     {NULL, NULL, 0, NULL}};
 
 static struct PyModuleDef cmutf8_module = {
-    PyModuleDef_HEAD_INIT, "mutf8.cmutf8",
-    "Encoders and decoders for the MUTF-8 encoding.", -1, module_methods};
+    PyModuleDef_HEAD_INIT,
+    "mutf8.cmutf8",
+    PyDoc_STR("Encoders and decoders for the MUTF-8 encoding."),
+    -1,
+    module_methods,
+};
 
 PyMODINIT_FUNC
 PyInit_cmutf8(void)
