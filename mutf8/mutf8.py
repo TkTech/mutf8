@@ -18,9 +18,9 @@ def decode_modified_utf8(s: bytes) -> str:
             raise UnicodeDecodeError(
                 'mutf-8',
                 s,
-                ix - 1,
-                ix - 1,
-                'mutf-8 does not allow NULL bytes.',
+                ix,
+                ix + 1,
+                'Embedded NULL byte in input.',
             )
         elif x & 0b10000000 == 0b00000000:
             # ASCII
@@ -32,9 +32,9 @@ def decode_modified_utf8(s: bytes) -> str:
                 raise UnicodeDecodeError(
                     'mutf-8',
                     s,
-                    ix - 1,
-                    ix - 1,
-                    'Incomplete two-byte codepoint.',
+                    ix,
+                    ix + 1,
+                    '2-byte codepoint started, but input too short to finish',
                 )
 
             x = (
@@ -49,9 +49,9 @@ def decode_modified_utf8(s: bytes) -> str:
                 raise UnicodeDecodeError(
                     'mutf-8',
                     s,
-                    ix - 1,
-                    ix - 1,
-                    'Incomplete six-byte codepoint.'
+                    ix,
+                    ix + 1,
+                    '6-byte codepoint started, but input too short to finish',
                 )
 
             x = (
@@ -69,9 +69,9 @@ def decode_modified_utf8(s: bytes) -> str:
                 raise UnicodeDecodeError(
                     'mutf-8',
                     s,
-                    ix - 1,
-                    ix - 1,
-                    'Incomplete three-byte codepoint.'
+                    ix,
+                    ix + 1,
+                    '3-byte codepoint started, but input too short to finish',
                 )
 
             x = (

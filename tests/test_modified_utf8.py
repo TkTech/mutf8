@@ -20,25 +20,29 @@ def test_decode_bad_mutf8(decoder):
     with pytest.raises(UnicodeDecodeError) as excinfo:
         decoder(b'\x00')
 
-    assert 'NULL bytes' in excinfo.value.reason
+    assert excinfo.value.encoding == 'mutf-8'
+    assert 'Embedded NULL' in excinfo.value.reason
 
     # Start of a two-byte codepoint without the sibling.
     with pytest.raises(UnicodeDecodeError) as excinfo:
         decoder(b'\xC2')
 
-    assert 'two-byte' in excinfo.value.reason
+    assert excinfo.value.encoding == 'mutf-8'
+    assert '2-byte' in excinfo.value.reason
 
     # Start of a six-byte codepoint without the sibling.
     with pytest.raises(UnicodeDecodeError) as excinfo:
         decoder(b'\xED')
 
-    assert 'six-byte' in excinfo.value.reason
+    assert excinfo.value.encoding == 'mutf-8'
+    assert '6-byte' in excinfo.value.reason
 
     # Start of a three-byte codepoint without the sibling.
     with pytest.raises(UnicodeDecodeError) as excinfo:
         decoder(b'\xE2')
 
-    assert 'three-byte' in excinfo.value.reason
+    assert excinfo.value.encoding == 'mutf-8'
+    assert '3-byte' in excinfo.value.reason
 
 
 @pytest.mark.parametrize('module', [pymutf8, cmutf8])

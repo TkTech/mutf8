@@ -2,14 +2,6 @@
 #include <Python.h>
 #include <stdint.h>
 
-static const char *DECODING_ERRORS[] = {
-    "mutf-8 does not allow NULL bytes.",
-    "Incomplete two-byte codepoint.",
-    "Incomplete three-byte codepoint.",
-    "Incomplete six-byte codepoint.",
-    NULL,
-};
-
 PyDoc_STRVAR(decode_doc,
              "Decodes a bytestring containing MUTF-8 as defined in section\n"
              "4.4.7 of the JVM specification.\n\n"
@@ -18,6 +10,26 @@ PyDoc_STRVAR(decode_doc,
 static PyObject *
 decode_modified_utf8(PyObject *self, PyObject *args)
 {
+#define return_err(_msg) do { \
+    PyObject *exc = PyObject_CallFunction( \
+        PyExc_UnicodeDecodeError, \
+        "sy#nns", \
+        "mutf-8", \
+        view.buf, \
+        view.len, \
+        ix, \
+        ix + 1, \
+        _msg \
+    ); \
+    if (exc != NULL) { \
+        PyCodec_StrictErrors(exc); \
+        Py_DECREF(exc); \
+    } \
+    PyMem_Free(cp_out); \
+    PyBuffer_Release(&view); \
+    return NULL; \
+} while(0)
+
     Py_buffer view;
 
     if (!PyArg_ParseTuple(args, "y*", &view)) {
@@ -30,20 +42,19 @@ decode_modified_utf8(PyObject *self, PyObject *args)
     // There's no point using PyUnicode_new and _WriteChar, because
     // it requires us to have iterated the string to get the maximum unicode
     // codepoint and count anyways.
-    uint32_t *cp_out = PyMem_Calloc(view.len, sizeof(Py_UCS4));
+    Py_UCS4 *cp_out = PyMem_Calloc(view.len, sizeof(Py_UCS4));
     if (!cp_out) {
         return PyErr_NoMemory();
     }
 
     // # of codepoints we found & current index into cp_out.
     Py_ssize_t cp_count = 0;
-    int error = -1;
 
     for (Py_ssize_t ix = 0; ix < view.len; ix++) {
         Py_UCS4 x = buf[ix];
+
         if (x == 0) {
-            error = 0;
-            break;
+            return_err("Embedded NULL byte in input.");
         }
         else if (x >> 7 == 0x00) {
             // ASCII/one-byte codepoint.
@@ -52,8 +63,8 @@ decode_modified_utf8(PyObject *self, PyObject *args)
         else if (x >> 5 == 0x06) {
             // Two-byte codepoint.
             if (ix + 1 >= view.len) {
-                error = 1;
-                break;
+                return_err("2-byte codepoint started, but input too short"
+                           " to finish.");
             }
             x = ((buf[ix + 0] & 0x1F) << 0x06 | (buf[ix + 1] & 0x3F));
             ix++;
@@ -61,8 +72,8 @@ decode_modified_utf8(PyObject *self, PyObject *args)
         else if (x == 0xED) {
             // Six-byte codepoint.
             if (ix + 5 >= view.len) {
-                error = 3;
-                break;
+                return_err("6-byte codepoint started, but input too short"
+                           " to finish.");
             }
             x = (0x10000 | (buf[ix + 1] & 0x0F) << 0x10 |
                  (buf[ix + 2] & 0x3F) << 0x0A | (buf[ix + 4] & 0x0F) << 0x06 |
@@ -72,8 +83,8 @@ decode_modified_utf8(PyObject *self, PyObject *args)
         else if (x >> 4 == 0x0E) {
             // Three-byte codepoint.
             if (ix + 2 >= view.len) {
-                error = 2;
-                break;
+                return_err("3-byte codepoint started, but input too short"
+                           " to finish.");
             }
             x = ((buf[ix + 0] & 0x0F) << 0x0C | (buf[ix + 1] & 0x3F) << 0x06 |
                  (buf[ix + 2] & 0x3F));
@@ -82,23 +93,13 @@ decode_modified_utf8(PyObject *self, PyObject *args)
         cp_out[cp_count++] = x;
     }
 
-    if (error != -1) {
-        PyObject *unicode_error =
-            PyObject_CallFunction(PyExc_UnicodeDecodeError, "sy#nns", "utf-8",
-                                  "", 0, 0, 1, DECODING_ERRORS[error]);
-        PyErr_SetObject(PyExc_UnicodeDecodeError, unicode_error);
-        Py_XDECREF(unicode_error);
-        PyMem_Free(cp_out);
-        PyBuffer_Release(&view);
-        return NULL;
-    }
-
     PyObject *out =
         PyUnicode_FromKindAndData(PyUnicode_4BYTE_KIND, cp_out, cp_count);
 
     PyMem_Free(cp_out);
     PyBuffer_Release(&view);
     return out;
+#undef return_err
 }
 
 PyDoc_STRVAR(encode_doc,
