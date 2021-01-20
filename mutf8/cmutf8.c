@@ -10,25 +10,19 @@ PyDoc_STRVAR(decode_doc,
 static PyObject *
 decode_modified_utf8(PyObject *self, PyObject *args)
 {
-#define return_err(_msg) do { \
-    PyObject *exc = PyObject_CallFunction( \
-        PyExc_UnicodeDecodeError, \
-        "sy#nns", \
-        "mutf-8", \
-        view.buf, \
-        view.len, \
-        ix, \
-        ix + 1, \
-        _msg \
-    ); \
-    if (exc != NULL) { \
-        PyCodec_StrictErrors(exc); \
-        Py_DECREF(exc); \
-    } \
-    PyMem_Free(cp_out); \
-    PyBuffer_Release(&view); \
-    return NULL; \
-} while(0)
+#define return_err(_msg)                                                    \
+    do {                                                                    \
+        PyObject *exc = PyObject_CallFunction(PyExc_UnicodeDecodeError,     \
+                                              "sy#nns", "mutf-8", view.buf, \
+                                              view.len, ix, ix + 1, _msg);  \
+        if (exc != NULL) {                                                  \
+            PyCodec_StrictErrors(exc);                                      \
+            Py_DECREF(exc);                                                 \
+        }                                                                   \
+        PyMem_Free(cp_out);                                                 \
+        PyBuffer_Release(&view);                                            \
+        return NULL;                                                        \
+    } while (0)
 
     Py_buffer view;
 
@@ -63,8 +57,9 @@ decode_modified_utf8(PyObject *self, PyObject *args)
         else if (x >> 5 == 0x06) {
             // Two-byte codepoint.
             if (ix + 1 >= view.len) {
-                return_err("2-byte codepoint started, but input too short"
-                           " to finish.");
+                return_err(
+                    "2-byte codepoint started, but input too short"
+                    " to finish.");
             }
             x = ((buf[ix + 0] & 0x1F) << 0x06 | (buf[ix + 1] & 0x3F));
             ix++;
@@ -72,8 +67,9 @@ decode_modified_utf8(PyObject *self, PyObject *args)
         else if (x == 0xED) {
             // Six-byte codepoint.
             if (ix + 5 >= view.len) {
-                return_err("6-byte codepoint started, but input too short"
-                           " to finish.");
+                return_err(
+                    "6-byte codepoint started, but input too short"
+                    " to finish.");
             }
             x = (0x10000 | (buf[ix + 1] & 0x0F) << 0x10 |
                  (buf[ix + 2] & 0x3F) << 0x0A | (buf[ix + 4] & 0x0F) << 0x06 |
@@ -83,8 +79,9 @@ decode_modified_utf8(PyObject *self, PyObject *args)
         else if (x >> 4 == 0x0E) {
             // Three-byte codepoint.
             if (ix + 2 >= view.len) {
-                return_err("3-byte codepoint started, but input too short"
-                           " to finish.");
+                return_err(
+                    "3-byte codepoint started, but input too short"
+                    " to finish.");
             }
             x = ((buf[ix + 0] & 0x0F) << 0x0C | (buf[ix + 1] & 0x3F) << 0x06 |
                  (buf[ix + 2] & 0x3F));
