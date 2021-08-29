@@ -1,18 +1,11 @@
 import pytest
 
-import mutf8.mutf8 as pymutf8
-import mutf8.cmutf8 as cmutf8
-
 
 def _pairs(*args):
     for a, b in args:
         yield chr(a), bytearray(b)
 
 
-@pytest.mark.parametrize('decoder', [
-    pymutf8.decode_modified_utf8,
-    cmutf8.decode_modified_utf8
-])
 def test_decode_bad_mutf8(decoder):
     """Ensure we do the right thing when we encounter invalid MUTF-8."""
     # There should never be a null byte in a MUTF-8 string. It's the
@@ -45,7 +38,6 @@ def test_decode_bad_mutf8(decoder):
     assert '3-byte' in excinfo.value.reason
 
 
-@pytest.mark.parametrize('module', [pymutf8, cmutf8])
 def test_two_byte(module):
     """
     Test two-byte encoding and decoding.
@@ -82,7 +74,6 @@ def test_two_byte(module):
         assert module.encode_modified_utf8(decoded) == original
 
 
-@pytest.mark.parametrize('module', [pymutf8, cmutf8])
 def test_three_byte(module):
     """
     Test three-byte encoding and decoding.
@@ -127,7 +118,6 @@ def test_three_byte(module):
         assert module.encode_modified_utf8(decoded) == original
 
 
-@pytest.mark.parametrize('module', [pymutf8, cmutf8])
 def test_six_byte(module):
     """
     Test six-byte encoding and decoding.

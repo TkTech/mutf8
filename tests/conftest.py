@@ -1,5 +1,8 @@
 import pytest
 
+import mutf8.mutf8 as pymutf8
+import mutf8.cmutf8 as cmutf8
+
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -23,3 +26,18 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if 'slow' in item.keywords:
             item.add_marker(skip_slow)
+
+
+@pytest.fixture(params=[pymutf8, cmutf8])
+def module(request):
+    yield request.param
+
+
+@pytest.fixture()
+def decoder(module):
+    yield module.decode_modified_utf8
+
+
+@pytest.fixture()
+def encoder(module):
+    yield module.encode_modified_utf8
