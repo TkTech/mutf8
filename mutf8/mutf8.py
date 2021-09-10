@@ -6,84 +6,101 @@ def decode_modified_utf8(s: bytes) -> str:
     :param s: bytestring to be converted.
     :returns: A unicode representation of the original string.
     """
-    s = bytearray(s)
-    buff = []
-    ix = 0
-    length = len(s)
+    s_out = []
+    s_len = len(s)
+    s_ix = 0
 
-    while ix < length:
-        x = s[ix]
+    while s_ix < s_len:
+        b1 = s[s_ix]
+        s_ix += 1
 
-        if x == 0:
+        if b1 == 0:
             raise UnicodeDecodeError(
                 'mutf-8',
                 s,
-                ix,
-                ix + 1,
-                'Embedded NULL byte in input.',
+                s_ix - 1,
+                s_ix,
+                'Embedded NULL byte in input.'
             )
-        elif x & 0b10000000 == 0b00000000:
-            # ASCII
-            x = x & 0x7F
-            ix += 1
-        elif x & 0b11100000 == 0b11000000:
+        if b1 < 0x80:
+            # ASCII/one-byte codepoint.
+            s_out.append(chr(b1))
+        elif (b1 & 0xE0) == 0xC0:
             # Two-byte codepoint.
-            if ix + 1 >= length:
+            if s_ix >= s_len:
                 raise UnicodeDecodeError(
-                    'mutf-8',
-                    s,
-                    ix,
-                    ix + 1,
-                    '2-byte codepoint started, but input too short to finish',
+                        'mutf-8',
+                        s,
+                        s_ix - 1,
+                        s_ix,
+                        '2-byte codepoint started, but input too short to'
+                        ' finish.'
+                    )
+
+            s_out.append(
+                chr(
+                    (b1 & 0x1F) << 0x06 |
+                    (s[s_ix] & 0x3F)
                 )
-
-            x = (
-                (s[ix + 0] & 0b00011111) << 0x06 |
-                (s[ix + 1] & 0b00111111)
             )
-
-            ix += 2
-        elif x == 0b11101101:
-            # Six-byte codepoint.
-            if ix + 5 >= length:
-                raise UnicodeDecodeError(
-                    'mutf-8',
-                    s,
-                    ix,
-                    ix + 1,
-                    '6-byte codepoint started, but input too short to finish',
-                )
-
-            x = (
-                0x10000 |
-                (s[ix + 1] & 0b00001111) << 0x10 |
-                (s[ix + 2] & 0b00111111) << 0x0A |
-                (s[ix + 4] & 0b00001111) << 0x06 |
-                (s[ix + 5] & 0b00111111)
-            )
-
-            ix += 6
-        elif x >> 4 == 0b1110:
+            s_ix += 1
+        elif (b1 & 0xF0) == 0xE0:
             # Three-byte codepoint.
-            if ix + 2 >= length:
+            if s_ix + 1 >= s_len:
                 raise UnicodeDecodeError(
-                    'mutf-8',
-                    s,
-                    ix,
-                    ix + 1,
-                    '3-byte codepoint started, but input too short to finish',
+                        'mutf-8',
+                        s,
+                        s_ix - 1,
+                        s_ix,
+                        '3-byte or 6-byte codepoint started, but input too'
+                        ' short to finish.'
+                    )
+
+            b2 = s[s_ix]
+            b3 = s[s_ix + 1]
+
+            if b1 == 0xED and (b2 & 0xF0) == 0xA0:
+                # Possible six-byte codepoint.
+                if s_ix + 4 >= s_len:
+                    raise UnicodeDecodeError(
+                            'mutf-8',
+                            s,
+                            s_ix - 1,
+                            s_ix,
+                            '3-byte or 6-byte codepoint started, but input too'
+                            ' short to finish.'
+                        )
+
+                b4 = s[s_ix + 2]
+                b5 = s[s_ix + 3]
+                b6 = s[s_ix + 4]
+
+                if b4 == 0xED and (b5 & 0xF0) == 0xB0:
+                    # Definite six-byte codepoint.
+                    s_out.append(
+                        chr(
+                            0x10000 |
+                            (b2 & 0x0F) << 0x10 |
+                            (b3 & 0x3F) << 0x0A |
+                            (b5 & 0x0F) << 0x06 |
+                            (b6 & 0x3F)
+                        )
+                    )
+                    s_ix += 5
+                    continue
+
+            s_out.append(
+                chr(
+                    (b1 & 0x0F) << 0x0C |
+                    (b2 & 0x3F) << 0x06 |
+                    (b3 & 0x3F)
                 )
-
-            x = (
-                (s[ix + 0] & 0b00001111) << 0x0C |
-                (s[ix + 1] & 0b00111111) << 0x06 |
-                (s[ix + 2] & 0b00111111)
             )
+            s_ix += 2
+        else:
+            raise RuntimeError
 
-            ix += 3
-
-        buff.append(x)
-    return u''.join(chr(b) for b in buff)
+    return u''.join(s_out)
 
 
 def encode_modified_utf8(u: str) -> bytes:

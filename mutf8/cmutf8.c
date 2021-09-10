@@ -50,41 +50,63 @@ decode_modified_utf8(PyObject *self, PyObject *args)
         if (x == 0) {
             return_err("Embedded NULL byte in input.");
         }
-        else if (x >> 7 == 0x00) {
+        else if (x < 0x80) {
             // ASCII/one-byte codepoint.
             x &= 0x7F;
         }
-        else if (x >> 5 == 0x06) {
+        else if ((x & 0xE0) == 0xC0) {
             // Two-byte codepoint.
             if (ix + 1 >= view.len) {
                 return_err(
                     "2-byte codepoint started, but input too short"
                     " to finish.");
             }
-            x = ((buf[ix + 0] & 0x1F) << 0x06 | (buf[ix + 1] & 0x3F));
+            x = ((x & 0x1F) << 0x06 | (buf[ix + 1] & 0x3F));
             ix++;
         }
-        else if (x == 0xED) {
-            // Six-byte codepoint.
-            if (ix + 5 >= view.len) {
-                return_err(
-                    "6-byte codepoint started, but input too short"
-                    " to finish.");
-            }
-            x = (0x10000 | (buf[ix + 1] & 0x0F) << 0x10 |
-                 (buf[ix + 2] & 0x3F) << 0x0A | (buf[ix + 4] & 0x0F) << 0x06 |
-                 (buf[ix + 5] & 0x3F));
-            ix += 5;
-        }
-        else if (x >> 4 == 0x0E) {
+        else if ((x & 0xF0) == 0xE0) {
             // Three-byte codepoint.
             if (ix + 2 >= view.len) {
                 return_err(
-                    "3-byte codepoint started, but input too short"
+                    "3-byte or 6-byte codepoint started, but input too short"
                     " to finish.");
             }
-            x = ((buf[ix + 0] & 0x0F) << 0x0C | (buf[ix + 1] & 0x3F) << 0x06 |
-                 (buf[ix + 2] & 0x3F));
+            uint8_t b2 = buf[ix + 1];
+            uint8_t b3 = buf[ix + 2];
+
+            if (x == 0xED && (b2 & 0xF0) == 0xA0) {
+                if (ix + 5 >= view.len) {
+                    return_err(
+                        "6-byte codepoint started, but input too short"
+                        " to finish.");
+                }
+
+                // Possible six-byte codepoint.
+                uint8_t b4 = buf[ix + 3];
+                uint8_t b5 = buf[ix + 4];
+                uint8_t b6 = buf[ix + 5];
+
+                if (b4 == 0xED && (b5 & 0xF0) == 0xB0) {
+                    // Definite six-byte codepoint.
+                    x = (
+                        0x10000 |
+                        (b2 & 0x0F) << 0x10 |
+                        (b3 & 0x3F) << 0x0A |
+                        (b5 & 0x0F) << 0x06 |
+                        (b6 & 0x3F)
+                    );
+                    ix += 5;
+                    cp_out[cp_count++] = x;
+                    continue;
+                }
+            }
+
+            x = (
+                (x & 0x0F) << 0x0C |
+                (b2 & 0x3F) << 0x06 |
+                (b3 & 0x3F)
+            );
+
             ix += 2;
         }
         cp_out[cp_count++] = x;
