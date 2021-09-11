@@ -12,7 +12,7 @@ with open(os.path.join(root, 'README.md'), 'rb') as readme:
 setup(
     name='mutf8',
     packages=find_packages(),
-    version='1.0.4',
+    version='1.0.5',
     description='Fast MUTF-8 encoder & decoder',
     long_description=long_description,
     long_description_content_type='text/markdown',
