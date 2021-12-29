@@ -121,6 +121,51 @@ decode_modified_utf8(PyObject *self, PyObject *args)
 #undef return_err
 }
 
+inline Py_ssize_t _encoded_size(void *data, Py_ssize_t length, int kind) {
+    Py_ssize_t byte_count = 0;
+
+    for (Py_ssize_t i = 0; i < length; i++) {
+        Py_UCS4 cp = PyUnicode_READ(kind, data, i);
+        if (cp == 0x00) {
+            // NULLs will get encoded as C0 80.
+            byte_count += 2;
+        } else if (cp <= 0x7F) {
+            byte_count++;
+        } else if (cp <= 0x7FF) {
+            byte_count += 2;
+        } else if (cp <= 0xFFFF) {
+            byte_count += 3;
+        } else {
+            byte_count += 6;
+        }
+    }
+
+    return byte_count;
+}
+
+PyDoc_STRVAR(encoded_size_doc,
+             "Returns the number of bytes required to store the given\n"
+             "unicode string when encoded as MUTF-8.\n\n"
+             ":param u: Unicode string to be converted.\n"
+             ":returns: The number of bytes required.");
+static PyObject *
+encoded_size(PyObject *self, PyObject *args)
+{
+    PyObject *src = NULL;
+
+    if (!PyArg_ParseTuple(args, "U", &src)) {
+        return NULL;
+    }
+
+    return PyLong_FromSsize_t(
+        _encoded_size(
+            PyUnicode_DATA(src),
+            PyUnicode_GET_LENGTH(src),
+            PyUnicode_KIND(src)
+        )
+    );
+}
+
 PyDoc_STRVAR(encode_doc,
              "Encodes a unicode string as MUTF-8 as defined in section\n"
              "4.4.7 of the JVM specification.\n\n"
@@ -138,9 +183,8 @@ encode_modified_utf8(PyObject *self, PyObject *args)
     void *data = PyUnicode_DATA(src);
     Py_ssize_t length = PyUnicode_GET_LENGTH(src);
     int kind = PyUnicode_KIND(src);
-    // There's no case in which the encoded version will be more than
-    // twice the size of the decoded version.
-    char *byte_out = PyMem_Calloc(length * 2, 1);
+    char *byte_out = PyMem_Calloc(_encoded_size(data, length, kind), 1);
+
     if (!byte_out) {
         return PyErr_NoMemory();
     }
@@ -188,6 +232,7 @@ encode_modified_utf8(PyObject *self, PyObject *args)
 static PyMethodDef module_methods[] = {
     {"decode_modified_utf8", decode_modified_utf8, METH_VARARGS, decode_doc},
     {"encode_modified_utf8", encode_modified_utf8, METH_VARARGS, encode_doc},
+    {"encoded_size", encoded_size, METH_VARARGS, encoded_size_doc},
     {NULL, NULL, 0, NULL}};
 
 static struct PyModuleDef cmutf8_module = {

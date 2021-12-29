@@ -23,3 +23,12 @@ def test_issue_1(encoder, decoder):
     decoded = decoder(encoded)
 
     assert sample == decoded
+
+
+def test_issue_3(encoder, decoder):
+    """
+    Underallocation due to an incorrect assumption on the maximum expansion
+    of an encoded string.
+    """
+    str = '黑人抬棺組裝包'
+    assert decoder(encoder(str)) == str
