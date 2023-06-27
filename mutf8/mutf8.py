@@ -79,11 +79,12 @@ def decode_modified_utf8(s: bytes) -> str:
                     # Definite six-byte codepoint.
                     s_out.append(
                         chr(
-                            0x10000 |
+                            0x10000 + (
                             (b2 & 0x0F) << 0x10 |
                             (b3 & 0x3F) << 0x0A |
                             (b5 & 0x0F) << 0x06 |
                             (b6 & 0x3F)
+                            )
                         )
                     )
                     s_ix += 5
@@ -137,7 +138,7 @@ def encode_modified_utf8(u: str) -> bytes:
             # Six-byte codepoint.
             final_string.extend([
                 0xED,
-                0xA0 | ((c >> 0x10) & 0x0F),
+                0xA0 | ((c >> 0x10) - 1 & 0x0F),
                 0x80 | ((c >> 0x0A) & 0x3f),
                 0xED,
                 0xb0 | ((c >> 0x06) & 0x0f),
