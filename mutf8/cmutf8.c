@@ -89,11 +89,12 @@ decode_modified_utf8(PyObject *self, PyObject *args)
                 if (b4 == 0xED && (b5 & 0xF0) == 0xB0) {
                     // Definite six-byte codepoint.
                     x = (
-                        0x10000 |
+                        0x10000 + (
                         (b2 & 0x0F) << 0x10 |
                         (b3 & 0x3F) << 0x0A |
                         (b5 & 0x0F) << 0x06 |
                         (b6 & 0x3F)
+                        )
                     );
                     ix += 5;
                     cp_out[cp_count++] = x;
@@ -216,7 +217,7 @@ encode_modified_utf8(PyObject *self, PyObject *args)
         else {
             // "Two-times-three" byte codepoint.
             byte_out[byte_count++] = 0xED;
-            byte_out[byte_count++] = 0xA0 | ((cp >> 0x10) & 0x0F);
+            byte_out[byte_count++] = 0xA0 | ((cp >> 0x10) - 1 & 0x0F);
             byte_out[byte_count++] = 0x80 | ((cp >> 0x0A) & 0x3F);
             byte_out[byte_count++] = 0xED;
             byte_out[byte_count++] = 0xB0 | ((cp >> 0x06) & 0x0F);
