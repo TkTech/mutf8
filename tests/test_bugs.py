@@ -32,3 +32,38 @@ def test_issue_3(encoder, decoder):
     """
     str = '黑人抬棺組裝包'
     assert decoder(encoder(str)) == str
+
+def test_issue_6(encoder, decoder):
+    """
+    Incorrect surrogate pair encoding.
+    """
+    for c, b in (
+        # individual bits
+        (0, b"\xC0\x80"),
+        (1, b"\x01"),
+        (2, b"\x02"),
+        (4, b"\x04"),
+        (8, b"\x08"),
+        (16, b"\x10"),
+        (32, b"\x20"),
+        (64, b"\x40"),
+        (128, b"\xc2\x80"),
+        (256, b"\xc4\x80"),
+        (512, b"\xc8\x80"),
+        (1024, b"\xd0\x80"),
+        (2048, b"\xe0\xa0\x80"),
+        (4096, b"\xe1\x80\x80"),
+        (8192, b"\xe2\x80\x80"),
+        (16384, b"\xe4\x80\x80"),
+        (32768, b"\xe8\x80\x80"),
+        (65536, b"\xed\xa0\x80\xed\xb0\x80"),
+        (131072, b"\xed\xa1\x80\xed\xb0\x80"),
+        (262144, b"\xed\xa3\x80\xed\xb0\x80"),
+        (524288, b"\xed\xa7\x80\xed\xb0\x80"),
+        (1048576, b"\xed\xaf\x80\xed\xb0\x80"),
+        # some specific character tests
+        (127993, b"\xed\xa0\xbc\xed\xbf\xb9"), # 🏹
+        (128031, b"\xed\xa0\xbd\xed\xb0\x9f"), # 🐟
+    ):
+        assert b == encoder(chr(c))
+        assert chr(c) == decoder(b)
