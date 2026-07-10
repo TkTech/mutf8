@@ -206,11 +206,14 @@ encode_modified_utf8(PyObject *self, PyObject *args)
         return PyUnicode_AsEncodedString(src, "utf-8", "surrogatepass");
     }
 
-    char *byte_out = PyMem_Calloc(_encoded_size(data, length, kind), 1);
-
-    if (!byte_out) {
-        return PyErr_NoMemory();
+    // Allocate the result up front at its exact size and write straight into
+    // it, avoiding a temporary buffer, its zeroing, and a full-output copy.
+    Py_ssize_t size = _encoded_size(data, length, kind);
+    PyObject *out = PyBytes_FromStringAndSize(NULL, size);
+    if (out == NULL) {
+        return NULL;
     }
+    char *byte_out = PyBytes_AS_STRING(out);
 
     Py_ssize_t byte_count = 0;
 
@@ -251,8 +254,6 @@ encode_modified_utf8(PyObject *self, PyObject *args)
         }
     }
 
-    PyObject *out = PyBytes_FromStringAndSize(byte_out, byte_count);
-    PyMem_Free(byte_out);
     return out;
 }
 
