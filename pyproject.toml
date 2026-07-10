@@ -51,8 +51,7 @@ testpaths = ["tests"]
 markers = ["slow: mark test as slow to run"]
 
 [tool.cibuildwheel]
-build-frontend = "build[uv]"
-skip = ["pp*", "*_i686"]
+skip = ["*_i686"]
 test-extras = ["test"]
 test-command = "pytest {project}/tests"
 
