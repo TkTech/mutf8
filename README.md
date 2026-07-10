@@ -3,8 +3,7 @@
 # mutf-8
 
 This package contains simple pure-python as well as C encoders and decoders for
-the MUTF-8 character encoding. In most cases, you can also parse the even-rarer
-CESU-8.
+the MUTF-8 character encoding.
 
 These days, you'll most likely encounter MUTF-8 when working on files or
 protocols related to the JVM. Strings in a Java `.class` file are encoded using
@@ -14,26 +13,14 @@ serializer.
 This library was extracted from [Lawu][], a Python library for working with JVM
 class files.
 
-## 🎉 Installation
+## Installation
 
+Prebuilt binary packages are available for most platforms and Python versions.
 Install the package from PyPi:
 
 ```
 pip install mutf8
 ```
-
-Binary wheels are built for CPython 3.9 through 3.14 on the following
-platforms:
-
-|                          | 3.9 | 3.10 | 3.11 | 3.12 | 3.13 | 3.14 |
-| ------------------------ | --- | ---- | ---- | ---- | ---- | ---- |
-| macOS (x86_64, arm64)    | y   | y    | y    | y    | y    | y    |
-| Windows (x86_64)         | y   | y    | y    | y    | y    | y    |
-| Linux (x86_64, arm64)    | y   | y    | y    | y    | y    | y    |
-
-If binary wheels are not available, it will attempt to build the C extension
-from source with any C99 compiler. If it could not build, it will fall back
-to a pure-python version.
 
 ## Usage
 
@@ -49,23 +36,48 @@ bytes = encode_modified_utf8(unicode)
 This module *does not* register itself globally as a codec, since importing
 should be side-effect-free.
 
-## 📈 Benchmarks
+## Benchmarks
 
-The C extension is significantly faster - often 20x to 40x faster.
+The C extension is dramatically faster than the pure-Python fallback — from
+~10× on tiny strings (where per-call overhead dominates) to several hundred
+times on realistic payloads, and over 1000× when encoding large ASCII.
 
 <!-- BENCHMARK START -->
 
 ### MUTF-8 Decoding
-| Name                         |   Min (μs) |   Max (μs) |   StdDev |           Ops |
-|------------------------------|------------|------------|----------|---------------|
-| cmutf8-decode_modified_utf8  |    0.00009 |    0.00080 |  0.00000 | 9957678.56358 |
-| pymutf8-decode_modified_utf8 |    0.00190 |    0.06040 |  0.00000 |  450455.96019 |
+
+| Input | C | Python | Speedup |
+|-------|---|--------|--------:|
+| ASCII (16 B) | 81.5 ± 26 ns | 1.04 ± 0.18 µs | 13× |
+| ASCII (1 KB) | 185 ± 38 ns | 65.7 ± 8.5 µs | 356× |
+| ASCII (64 KB) | 5.58 ± 0.66 µs | 4.35 ± 0.23 ms | 780× |
+| CJK (16 B) | 127 ± 15 ns | 1.33 ± 0.15 µs | 10× |
+| CJK (1 KB) | 681 ± 117 ns | 99.3 ± 9.4 µs | 146× |
+| CJK (64 KB) | 31.8 ± 3.3 µs | 6.28 ± 0.063 ms | 198× |
+| Emoji (16 B) | 100 ± 21 ns | 882 ± 122 ns | 9× |
+| Emoji (1 KB) | 538 ± 119 ns | 79.6 ± 6.9 µs | 148× |
+| Emoji (64 KB) | 26.2 ± 4.1 µs | 5.32 ± 0.13 ms | 203× |
+| Mixed (16 B) | 118 ± 27 ns | 2.17 ± 0.16 µs | 18× |
+| Mixed (1 KB) | 860 ± 162 ns | 76.7 ± 9.2 µs | 89× |
+| Mixed (64 KB) | 38 ± 5 µs | 5.3 ± 0.48 ms | 139× |
 
 ### MUTF-8 Encoding
-| Name                         |   Min (μs) |   Max (μs) |   StdDev |            Ops |
-|------------------------------|------------|------------|----------|----------------|
-| cmutf8-encode_modified_utf8  |    0.00008 |    0.00151 |  0.00000 | 11897361.05101 |
-| pymutf8-encode_modified_utf8 |    0.00180 |    0.16650 |  0.00000 |   474390.98091 |
+
+| Input | C | Python | Speedup |
+|-------|---|--------|--------:|
+| ASCII (16 B) | 70.5 ± 5.8 ns | 1.23 ± 0.15 µs | 18× |
+| ASCII (1 KB) | 109 ± 16 ns | 49 ± 6.2 µs | 449× |
+| ASCII (64 KB) | 1.55 ± 0.27 µs | 2.93 ± 0.19 ms | 1889× |
+| CJK (16 B) | 81.4 ± 12 ns | 2.02 ± 0.26 µs | 25× |
+| CJK (1 KB) | 624 ± 127 ns | 108 ± 16 µs | 173× |
+| CJK (64 KB) | 32.5 ± 2.9 µs | 6.8 ± 0.24 ms | 209× |
+| Emoji (16 B) | 73 ± 10 ns | 1.17 ± 0.12 µs | 16× |
+| Emoji (1 KB) | 621 ± 76 ns | 67 ± 8.5 µs | 108× |
+| Emoji (64 KB) | 33.3 ± 6 µs | 3.98 ± 0.12 ms | 119× |
+| Mixed (16 B) | 108 ± 97 ns | 2.48 ± 0.35 µs | 23× |
+| Mixed (1 KB) | 1.39 ± 0.29 µs | 63.3 ± 3.5 µs | 45× |
+| Mixed (64 KB) | 81.2 ± 14 µs | 3.91 ± 0.093 ms | 48× |
+
 <!-- BENCHMARK END -->
 
 ## C Extension

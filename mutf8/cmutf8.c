@@ -1,6 +1,7 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <stdint.h>
+#include <string.h>
 
 PyDoc_STRVAR(decode_doc,
              "Decodes a bytestring containing MUTF-8 as defined in section\n"
@@ -32,6 +33,22 @@ decode_modified_utf8(PyObject *self, PyObject *args)
 
     // MUTF-8 input.
     uint8_t *buf = (uint8_t *)view.buf;
+
+    // Fast path: without 0xED (leads every surrogate/6-byte form), 0xC0 (the
+    // NUL escape) or a raw 0x00 (illegal), the input is plain UTF-8. Offload
+    // to CPython's optimized decoder; on any error fall back to the strict
+    // loop below so the exception is still reported as mutf-8.
+    if (memchr(buf, 0xED, view.len) == NULL &&
+        memchr(buf, 0xC0, view.len) == NULL &&
+        memchr(buf, 0x00, view.len) == NULL) {
+        PyObject *fast = PyUnicode_DecodeUTF8((const char *)buf, view.len, NULL);
+        if (fast != NULL) {
+            PyBuffer_Release(&view);
+            return fast;
+        }
+        PyErr_Clear();
+    }
+
     // Array of temporary UCS-4 codepoints.
     // There's no point using PyUnicode_new and _WriteChar, because
     // it requires us to have iterated the string to get the maximum unicode
@@ -180,6 +197,15 @@ encode_modified_utf8(PyObject *self, PyObject *args)
     void *data = PyUnicode_DATA(src);
     Py_ssize_t length = PyUnicode_GET_LENGTH(src);
     int kind = PyUnicode_KIND(src);
+
+    // Fast path: with no supplementary char (kind < 4-byte) and no embedded
+    // NUL, MUTF-8 == UTF-8 with "surrogatepass" (same 3-byte form for lone
+    // surrogates). Offload to CPython's optimized encoder.
+    if (kind != PyUnicode_4BYTE_KIND &&
+        PyUnicode_FindChar(src, 0, 0, length, 1) == -1) {
+        return PyUnicode_AsEncodedString(src, "utf-8", "surrogatepass");
+    }
+
     char *byte_out = PyMem_Calloc(_encoded_size(data, length, kind), 1);
 
     if (!byte_out) {
