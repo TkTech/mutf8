@@ -74,33 +74,30 @@ decode_modified_utf8(PyObject *self, PyObject *args)
             uint8_t b2 = buf[ix + 1];
             uint8_t b3 = buf[ix + 2];
 
-            if (x == 0xED && (b2 & 0xF0) == 0xA0) {
-                if (ix + 5 >= view.len) {
-                    return_err(
-                        "6-byte codepoint started, but input too short"
-                        " to finish.");
-                }
-
-                // Possible six-byte codepoint.
-                uint8_t b4 = buf[ix + 3];
+            if (x == 0xED && (b2 & 0xF0) == 0xA0 && ix + 5 < view.len &&
+                buf[ix + 3] == 0xED && (buf[ix + 4] & 0xF0) == 0xB0) {
+                // Six-byte codepoint: a supplementary character written as a
+                // UTF-16 surrogate pair, each half encoded as its own 3-byte
+                // sequence. We only take this branch once a low surrogate is
+                // confirmed to follow; otherwise `x b2 b3` is a lone
+                // (unpaired) surrogate and is decoded as a normal 3-byte
+                // codepoint below.
                 uint8_t b5 = buf[ix + 4];
                 uint8_t b6 = buf[ix + 5];
-
-                if (b4 == 0xED && (b5 & 0xF0) == 0xB0) {
-                    // Definite six-byte codepoint.
-                    x = (
-                        0x10000 |
-                        (b2 & 0x0F) << 0x10 |
-                        (b3 & 0x3F) << 0x0A |
-                        (b5 & 0x0F) << 0x06 |
-                        (b6 & 0x3F)
-                    );
-                    ix += 5;
-                    cp_out[cp_count++] = x;
-                    continue;
-                }
+                x = (
+                    0x10000 +
+                    ((b2 & 0x0F) << 0x10 |
+                     (b3 & 0x3F) << 0x0A |
+                     (b5 & 0x0F) << 0x06 |
+                     (b6 & 0x3F))
+                );
+                ix += 5;
+                cp_out[cp_count++] = x;
+                continue;
             }
 
+            // Regular three-byte codepoint. This also covers lone/unpaired
+            // surrogates, each of which is encoded as a single 3-byte sequence.
             x = (
                 (x & 0x0F) << 0x0C |
                 (b2 & 0x3F) << 0x06 |
@@ -214,7 +211,11 @@ encode_modified_utf8(PyObject *self, PyObject *args)
             byte_out[byte_count++] = (0x80 | (0x3F & cp));
         }
         else {
-            // "Two-times-three" byte codepoint.
+            // Six-byte codepoint: a supplementary character written as a
+            // UTF-16 surrogate pair, each half encoded as its own 3-byte
+            // sequence. The codepoint is first offset by 0x10000 as required
+            // by the surrogate-pair algorithm.
+            cp -= 0x10000;
             byte_out[byte_count++] = 0xED;
             byte_out[byte_count++] = 0xA0 | ((cp >> 0x10) & 0x0F);
             byte_out[byte_count++] = 0x80 | ((cp >> 0x0A) & 0x3F);
