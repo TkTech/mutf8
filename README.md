@@ -1,4 +1,4 @@
-![Tests](https://github.com/TkTech/mutf8/workflows/Tests/badge.svg?branch=master)
+![CI](https://github.com/TkTech/mutf8/actions/workflows/release.yml/badge.svg)
 
 # mutf-8
 
@@ -22,13 +22,14 @@ Install the package from PyPi:
 pip install mutf8
 ```
 
-Binary wheels are available for the following:
+Binary wheels are built for CPython 3.9 through 3.14 on the following
+platforms:
 
-|                  | py3.6 | py3.7 | py3.8 | py3.9 |
-| ---------------- | ----- | ----- | ----- | ----- |
-| OS X (x86_64)    | y     | y     | y     | y     |
-| Windows (x86_64) | y     | y     | y     | y     |
-| Linux (x86_64)   | y     | y     | y     | y     |
+|                          | 3.9 | 3.10 | 3.11 | 3.12 | 3.13 | 3.14 |
+| ------------------------ | --- | ---- | ---- | ---- | ---- | ---- |
+| macOS (x86_64, arm64)    | y   | y    | y    | y    | y    | y    |
+| Windows (x86_64)         | y   | y    | y    | y    | y    | y    |
+| Linux (x86_64, arm64)    | y   | y    | y    | y    | y    | y    |
 
 If binary wheels are not available, it will attempt to build the C extension
 from source with any C99 compiler. If it could not build, it will fall back

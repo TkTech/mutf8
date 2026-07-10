@@ -10,6 +10,8 @@ MUTF-8 is the same as CESU-8, but with different encoding for 0x00 bytes.
     for MUTF-8/CESU-8 into the python core.
 """
 
+__version__ = "1.0.6"
+
 
 try:
     from mutf8.cmutf8 import decode_modified_utf8, encode_modified_utf8
