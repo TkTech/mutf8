@@ -10,7 +10,7 @@ MUTF-8 is the same as CESU-8, but with different encoding for 0x00 bytes.
     for MUTF-8/CESU-8 into the python core.
 """
 
-__version__ = "1.0.6"
+__version__ = "1.1.0"
 
 
 try:
