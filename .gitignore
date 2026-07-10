@@ -1,9 +1,14 @@
 *.pyc
 *.pyd
 venv
+.venv/
 .eggs
 cython_debug/*
 build/
 _build/
+dist/
+wheelhouse/
 *.egg-info
 *.so
+uv.lock
+*.idea

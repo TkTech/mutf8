@@ -59,36 +59,30 @@ def decode_modified_utf8(s: bytes) -> str:
             b2 = s[s_ix]
             b3 = s[s_ix + 1]
 
-            if b1 == 0xED and (b2 & 0xF0) == 0xA0:
-                # Possible six-byte codepoint.
-                if s_ix + 4 >= s_len:
-                    raise UnicodeDecodeError(
-                            'mutf-8',
-                            s,
-                            s_ix - 1,
-                            s_ix,
-                            '3-byte or 6-byte codepoint started, but input too'
-                            ' short to finish.'
-                        )
-
-                b4 = s[s_ix + 2]
+            if (b1 == 0xED and (b2 & 0xF0) == 0xA0 and s_ix + 4 < s_len
+                    and s[s_ix + 2] == 0xED and (s[s_ix + 3] & 0xF0) == 0xB0):
+                # Six-byte codepoint: a supplementary character written as a
+                # UTF-16 surrogate pair, each half encoded as its own 3-byte
+                # sequence. Only take this branch once we've confirmed a low
+                # surrogate actually follows; otherwise `b1 b2 b3` is a lone
+                # (unpaired) surrogate and is decoded as a normal 3-byte
+                # codepoint below.
                 b5 = s[s_ix + 3]
                 b6 = s[s_ix + 4]
-
-                if b4 == 0xED and (b5 & 0xF0) == 0xB0:
-                    # Definite six-byte codepoint.
-                    s_out.append(
-                        chr(
-                            0x10000 |
-                            (b2 & 0x0F) << 0x10 |
-                            (b3 & 0x3F) << 0x0A |
-                            (b5 & 0x0F) << 0x06 |
-                            (b6 & 0x3F)
-                        )
+                s_out.append(
+                    chr(
+                        0x10000 +
+                        ((b2 & 0x0F) << 0x10 |
+                         (b3 & 0x3F) << 0x0A |
+                         (b5 & 0x0F) << 0x06 |
+                         (b6 & 0x3F))
                     )
-                    s_ix += 5
-                    continue
+                )
+                s_ix += 5
+                continue
 
+            # Regular three-byte codepoint. This also covers lone/unpaired
+            # surrogates, each of which is encoded as a single 3-byte sequence.
             s_out.append(
                 chr(
                     (b1 & 0x0F) << 0x0C |
@@ -134,14 +128,18 @@ def encode_modified_utf8(u: str) -> bytes:
                 (0x80 | (0x3F & c))
             ])
         else:
-            # Six-byte codepoint.
+            # Six-byte codepoint: a supplementary character written as a
+            # UTF-16 surrogate pair, each half encoded as its own 3-byte
+            # sequence. The codepoint is first offset by 0x10000 as required
+            # by the surrogate-pair algorithm.
+            c -= 0x10000
             final_string.extend([
                 0xED,
                 0xA0 | ((c >> 0x10) & 0x0F),
-                0x80 | ((c >> 0x0A) & 0x3f),
+                0x80 | ((c >> 0x0A) & 0x3F),
                 0xED,
-                0xb0 | ((c >> 0x06) & 0x0f),
-                0x80 | (c & 0x3f)
+                0xB0 | ((c >> 0x06) & 0x0F),
+                0x80 | (c & 0x3F)
             ])
 
     return bytes(final_string)

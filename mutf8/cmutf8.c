@@ -1,6 +1,7 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <stdint.h>
+#include <string.h>
 
 PyDoc_STRVAR(decode_doc,
              "Decodes a bytestring containing MUTF-8 as defined in section\n"
@@ -32,6 +33,22 @@ decode_modified_utf8(PyObject *self, PyObject *args)
 
     // MUTF-8 input.
     uint8_t *buf = (uint8_t *)view.buf;
+
+    // Fast path: without 0xED (leads every surrogate/6-byte form), 0xC0 (the
+    // NUL escape) or a raw 0x00 (illegal), the input is plain UTF-8. Offload
+    // to CPython's optimized decoder; on any error fall back to the strict
+    // loop below so the exception is still reported as mutf-8.
+    if (memchr(buf, 0xED, view.len) == NULL &&
+        memchr(buf, 0xC0, view.len) == NULL &&
+        memchr(buf, 0x00, view.len) == NULL) {
+        PyObject *fast = PyUnicode_DecodeUTF8((const char *)buf, view.len, NULL);
+        if (fast != NULL) {
+            PyBuffer_Release(&view);
+            return fast;
+        }
+        PyErr_Clear();
+    }
+
     // Array of temporary UCS-4 codepoints.
     // There's no point using PyUnicode_new and _WriteChar, because
     // it requires us to have iterated the string to get the maximum unicode
@@ -74,33 +91,30 @@ decode_modified_utf8(PyObject *self, PyObject *args)
             uint8_t b2 = buf[ix + 1];
             uint8_t b3 = buf[ix + 2];
 
-            if (x == 0xED && (b2 & 0xF0) == 0xA0) {
-                if (ix + 5 >= view.len) {
-                    return_err(
-                        "6-byte codepoint started, but input too short"
-                        " to finish.");
-                }
-
-                // Possible six-byte codepoint.
-                uint8_t b4 = buf[ix + 3];
+            if (x == 0xED && (b2 & 0xF0) == 0xA0 && ix + 5 < view.len &&
+                buf[ix + 3] == 0xED && (buf[ix + 4] & 0xF0) == 0xB0) {
+                // Six-byte codepoint: a supplementary character written as a
+                // UTF-16 surrogate pair, each half encoded as its own 3-byte
+                // sequence. We only take this branch once a low surrogate is
+                // confirmed to follow; otherwise `x b2 b3` is a lone
+                // (unpaired) surrogate and is decoded as a normal 3-byte
+                // codepoint below.
                 uint8_t b5 = buf[ix + 4];
                 uint8_t b6 = buf[ix + 5];
-
-                if (b4 == 0xED && (b5 & 0xF0) == 0xB0) {
-                    // Definite six-byte codepoint.
-                    x = (
-                        0x10000 |
-                        (b2 & 0x0F) << 0x10 |
-                        (b3 & 0x3F) << 0x0A |
-                        (b5 & 0x0F) << 0x06 |
-                        (b6 & 0x3F)
-                    );
-                    ix += 5;
-                    cp_out[cp_count++] = x;
-                    continue;
-                }
+                x = (
+                    0x10000 +
+                    ((b2 & 0x0F) << 0x10 |
+                     (b3 & 0x3F) << 0x0A |
+                     (b5 & 0x0F) << 0x06 |
+                     (b6 & 0x3F))
+                );
+                ix += 5;
+                cp_out[cp_count++] = x;
+                continue;
             }
 
+            // Regular three-byte codepoint. This also covers lone/unpaired
+            // surrogates, each of which is encoded as a single 3-byte sequence.
             x = (
                 (x & 0x0F) << 0x0C |
                 (b2 & 0x3F) << 0x06 |
@@ -183,11 +197,23 @@ encode_modified_utf8(PyObject *self, PyObject *args)
     void *data = PyUnicode_DATA(src);
     Py_ssize_t length = PyUnicode_GET_LENGTH(src);
     int kind = PyUnicode_KIND(src);
-    char *byte_out = PyMem_Calloc(_encoded_size(data, length, kind), 1);
 
-    if (!byte_out) {
-        return PyErr_NoMemory();
+    // Fast path: with no supplementary char (kind < 4-byte) and no embedded
+    // NUL, MUTF-8 == UTF-8 with "surrogatepass" (same 3-byte form for lone
+    // surrogates). Offload to CPython's optimized encoder.
+    if (kind != PyUnicode_4BYTE_KIND &&
+        PyUnicode_FindChar(src, 0, 0, length, 1) == -1) {
+        return PyUnicode_AsEncodedString(src, "utf-8", "surrogatepass");
     }
+
+    // Allocate the result up front at its exact size and write straight into
+    // it, avoiding a temporary buffer, its zeroing, and a full-output copy.
+    Py_ssize_t size = _encoded_size(data, length, kind);
+    PyObject *out = PyBytes_FromStringAndSize(NULL, size);
+    if (out == NULL) {
+        return NULL;
+    }
+    char *byte_out = PyBytes_AS_STRING(out);
 
     Py_ssize_t byte_count = 0;
 
@@ -214,7 +240,11 @@ encode_modified_utf8(PyObject *self, PyObject *args)
             byte_out[byte_count++] = (0x80 | (0x3F & cp));
         }
         else {
-            // "Two-times-three" byte codepoint.
+            // Six-byte codepoint: a supplementary character written as a
+            // UTF-16 surrogate pair, each half encoded as its own 3-byte
+            // sequence. The codepoint is first offset by 0x10000 as required
+            // by the surrogate-pair algorithm.
+            cp -= 0x10000;
             byte_out[byte_count++] = 0xED;
             byte_out[byte_count++] = 0xA0 | ((cp >> 0x10) & 0x0F);
             byte_out[byte_count++] = 0x80 | ((cp >> 0x0A) & 0x3F);
@@ -224,8 +254,6 @@ encode_modified_utf8(PyObject *self, PyObject *args)
         }
     }
 
-    PyObject *out = PyBytes_FromStringAndSize(byte_out, byte_count);
-    PyMem_Free(byte_out);
     return out;
 }
 
